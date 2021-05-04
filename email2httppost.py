@@ -1,3 +1,5 @@
+# Command to deploy
+# gcloud app deploy --promote --stop-previous-version
 from google.appengine.api import urlfetch
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.mail_handlers import InboundMailHandler
@@ -7,6 +9,7 @@ from poster.encode import MultipartParam, multipart_encode
 from google.appengine.ext import db
 import logging
 from google.appengine.ext import ereporter
+import json
 
 ereporter.register_logger()
 
@@ -58,46 +61,27 @@ class PostToUrl(InboundMailHandler):
             subject = mail_message.subject if hasattr(mail_message, 'subject') else ''
 
             body = ''.join(self.get_body_parts(mail_message, 'text/plain'))
-            html_body = ''.join(self.get_body_parts(mail_message, 'text/html'))
 
-            try:
-                if os.environ.get('COPY_DB'):
-                    self.persist(message_id, sender, to, cc, bcc, subject, body, html_body)
-            except:
-                logging.exception('Error saving email.')
-                self.log_complete_message(complete_message)
 
-            try:
-                if os.environ.get('COPY_EMAIL'):
-                    self.send_copy(message_id, sender, to, cc, bcc, subject, body, html_body)
-            except:
-                logging.exception('Error sending email copy.')
-                self.log_complete_message(complete_message)
+            params = {'sender': sender,
+                      'to': to,
+                      'subject': subject,
+                      'body': body.strip().rstrip(),
+            }
 
-            params = [MultipartParam('sender', value=sender),
-                      MultipartParam('to', to),
-                      MultipartParam('subject', value=subject),
-                      MultipartParam('body', value=body),
-                      MultipartParam('htmlbody', value=html_body),
-            ]
-
-            if cc:
-                params.append(MultipartParam('cc', cc))
-            if bcc:
-                params.append(MultipartParam('bcc', bcc))
-            if message_id:
-                params.append(MultipartParam('message-id', message_id))
-
-            if hasattr(mail_message, 'attachments') and mail_message.attachments:
+        # Should Probably Fix This Eventually
+        #    if hasattr(mail_message, 'attachments') and mail_message.attachments:
                 # Only process the first
-                name, content = mail_message.attachments[0]
-                params.append(MultipartParam(
-                    'picture',
-                    filename=name,
-                    value=content.decode()))
+        #        name, content = mail_message.attachments[0]
+        #        params.append(MultipartParam(
+        #            'picture',
+        #            filename=name,
+        #            value=content.decode()))
 
-            payloadgen, headers = multipart_encode(params)
-            payload = str().join(payloadgen)
+            #payloadgen, headers = multipart_encode(params)
+            #payload = str().join(payloadgen)
+            headers = { 'Content-Type': "application/json" }
+            payload = json.JSONEncoder().encode(params)
 
             result = urlfetch.fetch(
                 url=os.environ.get('DESTINATION_URL'),
@@ -112,16 +96,6 @@ class PostToUrl(InboundMailHandler):
             logging.exception('Other unexpected error, logging')
             self.log_complete_message(complete_message)
 
-    def send_copy(self, message_id, original_sender, original_to, original_cc, original_bcc, original_subject, original_body, html_body):
-        to = os.environ.get('COPY_EMAIL_TO')
-        sender = os.environ.get('COPY_EMAIL_FROM')
-        subject = os.environ.get('COPY_EMAIL_SUBJECT')
-        body = 'Message Id=%s\nSender=%s\nTo=%s\nCc=%s\nBcc=%s\nSubject=%s\n\n%s\n\n%s' % (
-        message_id, original_sender, original_to, original_cc, original_bcc, original_subject, original_body, html_body)
-        mail.send_mail(sender=sender,
-            to=to,
-            subject=subject,
-            body=body)
 
     def persist(self, message_id, sender, to, cc, bcc, subject, body, html_body):
         email = Email(message_id=message_id, sender=sender, to=to, cc=cc, bcc=bcc, subject=subject, body=body, html_body=html_body)
