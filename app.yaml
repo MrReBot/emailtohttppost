@@ -1,5 +1,3 @@
-application: email2httppost
-version: 1
 runtime: python27
 api_version: 1
 threadsafe: true
@@ -13,13 +11,3 @@ inbound_services:
 
 env_variables:
   DESTINATION_URL: 'http://where.to.send.it'
-  # Whether to log the messages in the database
-  COPY_DB: True
-  # Whether to forward a copy of the email to another address
-  COPY_EMAIL: True
-  COPY_EMAIL_TO: 'jsvaughan@gmail.com'
-  COPY_EMAIL_FROM: 'noreply@freelywheely.com'
-  COPY_EMAIL_SUBJECT: 'The subject of the copy mail'
-
-
-
